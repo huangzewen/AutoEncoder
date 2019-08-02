@@ -124,8 +124,3 @@ if __name__ == "__main__":
     print(len(x_batches))
     print(len(x_batches[-1]))
     print(len(x_batches[-2]))
-
-
-
-
-
