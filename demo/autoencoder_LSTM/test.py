@@ -7,22 +7,18 @@ Module to test LSTM
 """
 
 import tensorflow as tf
+import ptb_reader
 
+DATA_PATH = "./data/simple-examples/data"
 
 lstm_hidden_size = 10
 batch_size = 100
 
 num_steps = 50
 
-lstm = tf.nn.rnn_cell.BasicLSTMCell(lstm_hidden_size)
+train_data, valid_data, test_data, vocabulary = ptb_reader.ptb_raw_data(DATA_PATH)
 
-state = lstm.zero_state(batch_size, tf.float32)
-
-loss = 0.0
-
-for i in range(num_steps):
-    if i > 0:
-        tf.get_variable_scope().reuse_varibales()
-    lstm_output, state = lstm(current_input, state)
-    final_output = fully_connected(lstm_output)
-    loss += calc_loss(final_output, expeted_output)
+print(train_data)
+print(valid_data)
+print(test_data)
+print(vocabulary)

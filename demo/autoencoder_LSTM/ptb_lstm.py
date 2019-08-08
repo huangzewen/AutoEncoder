@@ -15,15 +15,13 @@ import ptb_reader
 
 DATA_PATH = "./data/simple-examples/data"
 
-train_data, valid_data, test_data, _ = ptb_reader.ptb_raw_data(DATA_PATH)
-
 HIDEN_SIZE = 200
 NUM_LAYERS = 2
-VOCAB_SIZE = 1000
+VOCAB_SIZE = 10000
 
 LEARNING_RATE = 1.0
-TRAINING_BATCH_SIZE = 20
-TRAINING_NUM_STEP = 35
+TRAIN_BATCH_SIZE = 20
+TRAIN_NUM_STEP = 35
 
 EVAL_BATCH_SIZE = 1
 EVAL_NUM_STEP = 1
@@ -44,21 +42,23 @@ class PTBModel(object):
 
         if is_training:
             lstm_cell = tf.nn.rnn_cell.DropoutWrapper(lstm_cell,
-                                                     output_kep_prob=KEEP_PROB)
+                                                     output_keep_prob=KEEP_PROB)
 
         cell = tf.nn.rnn_cell.MultiRNNCell([lstm_cell]*NUM_LAYERS)
 
-        self.inital_state = cell.zero_state(batch_size, tf.float32)
+        self.initial_state = cell.zero_state(batch_size, tf.float32)
 
-        embedding = tf.get_variable("embedding", [VOCAB_SIZE, HIDEN_SIZE])
 
-        inputs = tf.nn.embedding_lookup(embedding, self.input_data)
+        with tf.device("/cpu:0"):
+            embedding = tf.get_variable("embedding", [VOCAB_SIZE, HIDEN_SIZE], dtype=tf.float32)
+            inputs = tf.nn.embedding_lookup(embedding, self.input_data)
 
-        if is_training: inputs = tf.nn.dropout(inputs, KEEP_PROB)
+        if is_training and KEEP_PROB < 1:
+            inputs = tf.nn.dropout(inputs, KEEP_PROB)
 
         outputs = []
 
-        state = self.inital_state
+        state = self.initial_state
 
         with tf.variable_scope("RNN"):
             for time_step in range(num_steps):
@@ -68,7 +68,7 @@ class PTBModel(object):
 
                 outputs.append(cell_output)
 
-        output = tf.reshape(tf.concat(1, outputs), [-1, HIDEN_SIZE])
+        output = tf.reshape(tf.concat(outputs, 0), [-1, HIDEN_SIZE])
 
         weight = tf.get_variable("weight", [HIDEN_SIZE, VOCAB_SIZE])
 
@@ -77,9 +77,11 @@ class PTBModel(object):
         logits = tf.matmul(output, weight) + bias
 
 
+        # loss = tf.contrib.legacy_seq2seq.sequence_loss_by_example([logits], [tf.reshape(self.targets, [-1])],
+        #                                                           [tf.ones([batch_size*num_steps], dtype=tf.float32)])
+
         loss = tf.contrib.legacy_seq2seq.sequence_loss_by_example([logits], [tf.reshape(self.targets, [-1])],
                                                                   [tf.ones([batch_size*num_steps], dtype=tf.float32)])
-
 
         self.cost = tf.reduce_sum(loss)/batch_size
 
@@ -92,9 +94,63 @@ class PTBModel(object):
         grads, _ = tf.clip_by_global_norm(tf.gradients(self.cost, trainable_variables), MAX_GRAD_NORM)
 
         optimizer = tf.train.GradientDescentOptimizer(LEARNING_RATE)
+
         self.train_op = optimizer.apply_gradients(zip(grads, trainable_variables))
 
 
+def run_epoch(session, model, data, train_op, output_log):
+    total_costs = 0.0
+    iters = 0
+    state = session.run(model.initial_state)
+    for step, (x, y) in enumerate(ptb_reader.ptb_iterator(data, model.batch_size,
+                                                          model.num_steps)):
+        # feed_dict = {}
+        # x, y = session.run(data_queue)
+        # feed_dict[model.input_data] = x
+        # feed_dict[model.targets] = y
+        #
+        # for i, (c, h) in enumerate(model.initial_state):
+        #     feed_dict[c] = state[i].c
+        #     feed_dict[h] = state[i].h
+
+        cost, state, _ = session.run([model.cost, model.final_state, train_op], {model.input_data: x, model.targets: y, model.initial_state: state})
+        total_costs += cost
+        iters += model.num_steps
+
+        if output_log and step % 100 == 0:
+            print('After %d steps,perplexity is %.3f' %
+                  (step, np.exp(total_costs / iters)))
+
+    return np.exp(total_costs / iters)
 
 
+def main(_):
+    train_data, valid_data, test_data, _ = ptb_reader.ptb_raw_data(DATA_PATH)
 
+    initializer = tf.random_uniform_initializer(-0.05, 0.05)
+
+    with tf.variable_scope("language_model", reuse=None, initializer=initializer):
+        train_model = PTBModel(True, TRAIN_BATCH_SIZE, TRAIN_NUM_STEP)
+
+    with tf.variable_scope("language_model", reuse=True, initializer=initializer):
+        eval_model = PTBModel(False, EVAL_BATCH_SIZE, EVAL_NUM_STEP)
+
+    with tf.Session() as session:
+        tf.initialize_all_variables().run()
+
+        for i in range(NUM_EPOCH):
+            print("In iteration: %d" %(i+1))
+
+            run_epoch(session, train_model, train_data,
+                      train_model.train_op, True)
+
+            valid_perplexity = run_epoch(session, eval_model, valid_data, tf.no_op(), False)
+
+            print("Epoch: %d Validation Perplexity: %3.f" % (i+1, valid_perplexity))
+
+        test_plexity = run_epoch(session,eval_model, test_data, tf.no_op(), False)
+
+        print("Test Perplexity: %.3f" %test_plexity)
+
+if __name__ == "__main__":
+    tf.app.run()
