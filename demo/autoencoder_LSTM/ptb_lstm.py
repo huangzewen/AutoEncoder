@@ -48,10 +48,8 @@ class PTBModel(object):
 
         self.initial_state = cell.zero_state(batch_size, tf.float32)
 
-
-        with tf.device("/cpu:0"):
-            embedding = tf.get_variable("embedding", [VOCAB_SIZE, HIDEN_SIZE], dtype=tf.float32)
-            inputs = tf.nn.embedding_lookup(embedding, self.input_data)
+        embedding = tf.get_variable("embedding", [VOCAB_SIZE, HIDEN_SIZE], dtype=tf.float32)
+        inputs = tf.nn.embedding_lookup(embedding, self.input_data)
 
         if is_training and KEEP_PROB < 1:
             inputs = tf.nn.dropout(inputs, KEEP_PROB)
@@ -104,16 +102,9 @@ def run_epoch(session, model, data, train_op, output_log):
     state = session.run(model.initial_state)
     for step, (x, y) in enumerate(ptb_reader.ptb_iterator(data, model.batch_size,
                                                           model.num_steps)):
-        # feed_dict = {}
-        # x, y = session.run(data_queue)
-        # feed_dict[model.input_data] = x
-        # feed_dict[model.targets] = y
-        #
-        # for i, (c, h) in enumerate(model.initial_state):
-        #     feed_dict[c] = state[i].c
-        #     feed_dict[h] = state[i].h
-
-        cost, state, _ = session.run([model.cost, model.final_state, train_op], {model.input_data: x, model.targets: y, model.initial_state: state})
+        cost, state, _ = session.run([model.cost, model.final_state, train_op],
+                                     {model.input_data: x, model.targets: y,
+                                      model.initial_state: state})
         total_costs += cost
         iters += model.num_steps
 
