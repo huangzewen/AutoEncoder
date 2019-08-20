@@ -1,0 +1,2 @@
+model_checkpoint_path: "apt_word2vec_weights_all.ckpt"
+all_model_checkpoint_paths: "apt_word2vec_weights_all.ckpt"

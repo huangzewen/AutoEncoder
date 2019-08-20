@@ -65,7 +65,7 @@ class APTDB(object):
                   "`Classes` AS d WHERE c.ftid='%s' AND c.aid=b.aid AND a.id=b.case_id AND b.cid=d.cid;"
 
         # SHANGHAI team's ftid = 1
-        params = (3, )
+        params = (1, )
         return self.query(sql_str, *params)
 
 

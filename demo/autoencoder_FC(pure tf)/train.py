@@ -28,6 +28,7 @@ MODEL_NAME = "model.ckpt"
 
 df_train = dataminer.get_train_0_x_rescaled()
 
+
 def train():
     x = tf.placeholder(tf.float32, [None, autoencoder_inference.INPUT_NODE], name='x-input')
     y_ = tf.placeholder(tf.float32, [None, autoencoder_inference.OUTPUT_NODE], name='y-output')
@@ -76,8 +77,10 @@ def train():
 
             saver.save(sess, os.path.join(MODEL_SAVE_PATH, MODEL_NAME), global_step=global_step)
 
+
 def main(argv=None):
     train()
+
 
 if __name__ == "__main__":
     tf.app.run()
